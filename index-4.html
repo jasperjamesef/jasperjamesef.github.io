@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vault</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  /* =====================================================
+     EDIT THE LOOK HERE
+     ===================================================== */
+  :root{
+    --outer:#fafafa;     /* background outside the app column (desktop) */
+    --bg:#ffffff;        /* app background */
+    --text:#000000;
+    --mute:#737373;
+    --line:#dbdbdb;
+    --accent:#0095f6;    /* buttons, links */
+    --like:#ed4956;      /* heart colour */
+    --width:470px;       /* app column width */
+    --top:52px;          /* top bar height */
+    --nav:52px;          /* bottom nav height */
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --story:linear-gradient(45deg,#f09433,#dc2743,#bc1888); /* ring around avatars */
+  }
+  @media (prefers-color-scheme: dark){
+    :root{--outer:#000;--bg:#000;--text:#fff;--mute:#a8a8a8;--line:#262626}
+  }
+  /* ===================================================== */
+
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0}
+  body{font:14px/1.4 var(--font);background:var(--outer);color:var(--text)}
+  body.reelsmode{overflow:hidden}
+  .hidden{display:none!important}
+  a{cursor:pointer;color:inherit;text-decoration:none}
+  button,input,textarea{font:inherit;color:inherit}
+  input,textarea{width:100%;padding:10px 12px;background:var(--outer);border:1px solid var(--line);border-radius:8px;outline:none}
+  textarea{resize:none}
+  button{cursor:pointer;background:none;border:0;padding:0}
+  .btn{background:var(--accent);color:#fff;border-radius:8px;padding:8px 16px;font-weight:600}
+  .btn2{background:var(--line);border-radius:8px;padding:7px 14px;font-weight:600;color:var(--text)}
+  .btn:disabled{opacity:.5}
+  .link{color:var(--mute);padding:0 12px;font-size:14px}
+  .grow{flex:1}
+  .meta{color:var(--mute);font-size:12px}
+  .empty{color:var(--mute);text-align:center;padding:60px 20px;grid-column:1/-1}
+  svg{display:block}
+
+  /* ---------- auth ---------- */
+  #auth{min-height:100dvh;display:grid;place-items:center;padding:20px}
+  #auth .card{background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:30px;width:100%;max-width:350px}
+  .brand{font:italic 700 36px/1 Georgia,serif;text-align:center;margin:0 0 6px}
+  .sub{color:var(--mute);text-align:center;margin:0 0 18px}
+  .tabs{display:flex;margin-bottom:14px;border-bottom:1px solid var(--line)}
+  .tabs button{flex:1;padding:8px;color:var(--mute);border-bottom:2px solid transparent}
+  .tabs button.on{color:var(--text);border-bottom-color:var(--text);font-weight:600}
+  #auth label{display:block;font-size:12px;color:var(--mute);margin:10px 0 4px}
+  #auth .btn{width:100%;margin-top:14px;padding:10px}
+  .msg{margin-top:12px;font-size:13px;min-height:18px;text-align:center}
+  .msg.err{color:var(--like)} .msg.ok{color:#16a34a}
+
+  /* ---------- shell ---------- */
+  #app{max-width:var(--width);margin:0 auto;min-height:100dvh;background:var(--bg);position:relative}
+  @media(min-width:520px){#app{border-left:1px solid var(--line);border-right:1px solid var(--line)}}
+  #topbar{position:sticky;top:0;z-index:10;height:var(--top);background:var(--bg);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 14px}
+  .logo{font:italic 700 24px/1 Georgia,serif}
+  #feedSwitch{display:flex;gap:16px}
+  #feedSwitch a{color:var(--mute);font-weight:600}
+  #feedSwitch a.on{color:var(--text)}
+  #view{padding-bottom:calc(var(--nav) + env(safe-area-inset-bottom))}
+  body.reelsmode #view{padding-bottom:0}
+  #nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:var(--width);height:calc(var(--nav) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:var(--bg);border-top:1px solid var(--line);display:flex;justify-content:space-around;align-items:center;z-index:10}
+  #nav button{padding:10px 24px;color:var(--mute)}
+  #nav button.on{color:var(--text)}
+  #nav button.on svg{stroke-width:2.6}
+
+  /* ---------- avatars ---------- */
+  .av{border-radius:50%;object-fit:cover;display:grid;place-items:center;color:#fff;font-weight:700;flex:none}
+  .ring{padding:2px;border-radius:50%;background:var(--story);display:block;line-height:0}
+  .ring .av{border:2px solid var(--bg)}
+
+  /* ---------- feed posts ---------- */
+  .post{border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:4px}
+  .ph{display:flex;align-items:center;gap:10px;padding:10px 12px}
+  .ph .un{font-weight:600}
+  .ph .more{margin-left:auto;color:var(--mute)}
+  .media{position:relative;background:#000;overflow:hidden;user-select:none;-webkit-user-select:none}
+  .media img,.media video{width:100%;max-height:590px;object-fit:cover;display:block}
+  .textpost{aspect-ratio:1/1;display:grid;place-items:center;padding:28px;text-align:center;font-size:22px;font-weight:600;color:#fff;background:linear-gradient(135deg,#833ab4,#fd1d1d 60%,#fcb045);word-break:break-word;white-space:pre-wrap}
+  .snd{position:absolute;right:10px;bottom:10px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;display:grid;place-items:center;font-size:13px;pointer-events:none}
+  .snd::before{content:"🔇"}
+  body.sound .snd::before{content:"🔊"}
+  .pop{position:absolute;left:50%;top:50%;color:#fff;pointer-events:none;animation:pop .8s ease forwards;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}
+  @keyframes pop{0%{transform:translate(-50%,-50%) scale(0);opacity:1}25%{transform:translate(-50%,-50%) scale(1.2)}60%{transform:translate(-50%,-50%) scale(1);opacity:1}100%{transform:translate(-50%,-50%) scale(1.1);opacity:0}}
+  .pa{display:flex;gap:16px;padding:10px 12px 4px}
+  .likebtn.on{color:var(--like)}
+  .likebtn.on svg{fill:var(--like);stroke:var(--like)}
+  .pl{padding:0 12px;font-weight:600}
+  .pc{padding:2px 12px;word-break:break-word}
+  .post .link{padding:2px 12px;display:block;text-align:left}
+
+  /* ---------- reels ---------- */
+  .reels{height:calc(100dvh - var(--top) - var(--nav));overflow-y:scroll;scroll-snap-type:y mandatory;background:#000;scrollbar-width:none}
+  .reels::-webkit-scrollbar{display:none}
+  .reel{height:100%;scroll-snap-align:start;scroll-snap-stop:always;position:relative;background:#000;color:#fff;overflow:hidden}
+  .reel .rm{position:absolute;inset:0}
+  .reel video{width:100%;height:100%;object-fit:cover}
+  .reel .snd{top:12px;bottom:auto}
+  .reel .ov{position:absolute;left:0;right:0;bottom:0;padding:40px 70px 18px 14px;background:linear-gradient(transparent,rgba(0,0,0,.65));pointer-events:none;word-break:break-word}
+  .reel .ov > *{pointer-events:auto}
+  .reel .rl{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-weight:600}
+  .reel .side{position:absolute;right:8px;bottom:26px;display:flex;flex-direction:column;align-items:center;gap:6px;color:#fff;font-size:12px}
+  .reel .side button{color:#fff;padding:6px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.5))}
+  .reel .side button.likebtn.on{color:var(--like)}
+  .reel .side span{margin-bottom:12px}
+
+  /* ---------- profile ---------- */
+  .pp{display:flex;align-items:center;gap:24px;padding:16px}
+  .stats{display:flex;flex:1;justify-content:space-around;text-align:center;color:var(--mute);font-size:13px}
+  .stats b{display:block;color:var(--text);font-size:16px}
+  .pn{padding:0 16px 12px}
+  .pn .row{display:flex;gap:8px;margin-top:12px}
+  .pn .row > *{flex:1}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
+  .tile{position:relative;aspect-ratio:1;background:var(--line);overflow:hidden;display:block}
+  .tile img,.tile video{width:100%;height:100%;object-fit:cover;display:block}
+  .tile .tb{position:absolute;top:6px;right:6px;color:#fff}
+  .tile .tt{padding:8px;font-size:12px;word-break:break-word;color:var(--text)}
+
+  /* ---------- sheet ---------- */
+  #sheet{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}
+  #sheetPanel{background:var(--bg);width:100%;max-width:var(--width);max-height:88dvh;border-radius:14px 14px 0 0;display:flex;flex-direction:column;overflow:hidden}
+  .sh-head{position:relative;text-align:center;font-weight:600;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .sh-head button{position:absolute;right:12px;top:10px;color:var(--mute);font-size:20px;line-height:1}
+  .sh-body{overflow:auto;padding:12px 16px;flex:1}
+  .sh-body.flush{padding:0}
+  .sh-foot{display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+  .comment{display:flex;gap:10px;margin-bottom:14px;word-break:break-word}
+  .comment .x{margin-left:8px;color:var(--mute);font-size:12px}
+  #prev img,#prev video{width:100%;max-height:260px;object-fit:cover;border-radius:8px;margin-top:10px}
+  .sh-body label{display:block;font-size:12px;color:var(--mute);margin:10px 0 4px}
+
+  #toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#262626;color:#fff;padding:9px 16px;border-radius:8px;z-index:99;font-size:13px}
+</style>
+</head>
+<body>
+
+<!-- ============ AUTH ============ -->
+<section id="auth">
+  <div class="card">
+    <h1 class="brand">Vault</h1>
+    <p class="sub">Sign in to see what everyone is sharing.</p>
+    <div class="tabs">
+      <button id="tabLogin" class="on" type="button">Log in</button>
+      <button id="tabSignup" type="button">Sign up</button>
+    </div>
+
+    <form id="loginForm">
+      <label>Email or username</label>
+      <input id="loginId" autocomplete="username" required>
+      <label>Password</label>
+      <input id="loginPw" type="password" autocomplete="current-password" required>
+      <button class="btn" type="submit">Log in</button>
+      <div style="margin-top:12px;text-align:center"><a href="#" id="forgot" style="color:var(--mute);font-size:13px">Forgot password?</a></div>
+    </form>
+
+    <form id="signupForm" class="hidden">
+      <label>Email</label>
+      <input id="suEmail" type="email" autocomplete="email" required>
+      <label>Username (3–24 letters, numbers, _ . -)</label>
+      <input id="suUser" autocomplete="username" pattern="[A-Za-z0-9_.\-]{3,24}" required>
+      <label>Password (min 8 characters)</label>
+      <input id="suPw" type="password" minlength="8" autocomplete="new-password" required>
+      <label>Repeat password</label>
+      <input id="suPw2" type="password" minlength="8" autocomplete="new-password" required>
+      <button class="btn" type="submit">Create account</button>
+    </form>
+    <div id="authMsg" class="msg"></div>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<section id="app" class="hidden">
+  <header id="topbar">
+    <b class="logo">Vault</b>
+    <div id="feedSwitch">
+      <a id="tabAll" class="on" data-act="feed" data-feed="all">For you</a>
+      <a id="tabFollowing" data-act="feed" data-feed="following">Following</a>
+    </div>
+  </header>
+  <div id="view"></div>
+  <nav id="nav"></nav>
+</section>
+
+<div id="sheet" class="hidden"><div id="sheetPanel"></div></div>
+<div id="toast" class="hidden"></div>
+
+<script>
+/* ================================================================
+   SUPABASE DETAILS
+   ================================================================ */
+const SUPABASE_URL = "https://kxmzfxlrzszffsbinoss.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_4WxKO5cDiq3jUk3T215JAg_xRKvmj5X";
+const BUCKET = "uploads";
+const PAGE = 8;                       // posts loaded per scroll step
+const MAX_MB = 50;                    // upload size limit (Supabase free plan)
+const SEL = "*, profiles!user_id(username,avatar_path), likes(user_id), comments(count)";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+const S = { user:null, username:"", avatarPath:null, bio:"", view:"home", feed:"all", profileId:null, sound:false, following:[], createFile:null };
+const P = {};                         // per-post like/comment state, keyed by post id
+let L = { from:0, done:false, busy:false, token:0 };
+
+/* ---------- icons ---------- */
+const PATHS = {
+  heart:'<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.2l7.8-7.7 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>',
+  comment:'<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>',
+  home:'<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+  reels:'<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M10 8.5l5 3.500-5 3.500z"/>',
+  plus:'<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>',
+  trash:'<path d="M3 6h18"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/>',
+  play:'<path d="M6 4l14 8-14 8z" fill="currentColor"/>'
+};
+const ic = (n, s=24, fill=false) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="${fill?"currentColor":"none"}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${PATHS[n]}</svg>`;
+
+/* ---------- helpers ---------- */
+function authMsg(text, type="err"){ const m=$("authMsg"); m.textContent=text; m.className="msg "+type; }
+function toast(t){ const el=$("toast"); el.textContent=t; el.classList.remove("hidden"); clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.add("hidden"),3000); }
+function fail(error){ console.error(error); toast("Error: "+(error.message||error)); }
+function ago(iso){
+  const s=(Date.now()-new Date(iso))/1000;
+  if(s<60) return "now";
+  if(s<3600) return Math.floor(s/60)+"m";
+  if(s<86400) return Math.floor(s/3600)+"h";
+  if(s<604800) return Math.floor(s/86400)+"d";
+  return new Date(iso).toLocaleDateString();
+}
+const pubUrl = p => sb.storage.from(BUCKET).getPublicUrl(p).data.publicUrl;
+const hue = n => { let h=0; for(const c of n||"") h=(h*31+c.charCodeAt(0))%360; return `hsl(${h},55%,48%)`; };
+function avatar(path, name, size=32){
+  const st=`width:${size}px;height:${size}px;font-size:${Math.round(size*.45)}px`;
+  return path
+    ? `<img class="av" style="${st}" src="${esc(pubUrl(path))}" alt="">`
+    : `<div class="av" style="${st};background:${hue(name)}">${esc((name||"?")[0].toUpperCase())}</div>`;
+}
+const likeText = n => `${n} like${n===1?"":"s"}`;
+const commentText = n => n ? `View all ${n} comment${n===1?"":"s"}` : "Add a comment…";
+const safeName = n => n.replace(/[^\w.\-]+/g,"_");
+
+/* ---------- auth UI ---------- */
+function showTab(login){
+  $("loginForm").classList.toggle("hidden",!login);
+  $("signupForm").classList.toggle("hidden",login);
+  $("tabLogin").classList.toggle("on",login);
+  $("tabSignup").classList.toggle("on",!login);
+  authMsg("");
+}
+$("tabLogin").onclick=()=>showTab(true);
+$("tabSignup").onclick=()=>showTab(false);
+
+$("signupForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const email=$("suEmail").value.trim(), username=$("suUser").value.trim();
+  const pw=$("suPw").value;
+  if(pw!==$("suPw2").value) return authMsg("Passwords don't match.");
+  const { data:free, error:e1 } = await sb.rpc("username_available",{u:username});
+  if(e1) return authMsg(e1.message);
+  if(!free) return authMsg("That username is taken.");
+  const { data, error } = await sb.auth.signUp({ email, password:pw, options:{ data:{ username } } });
+  if(error) return authMsg(error.message);
+  if(!data.session) authMsg("Account created. Check your email to confirm, then log in.","ok");
+});
+
+$("loginForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  let id=$("loginId").value.trim();
+  authMsg("Logging in…","ok");
+  try{
+    if(!id.includes("@")){
+      const { data, error } = await sb.rpc("get_email_by_username",{u:id});
+      if(error) return authMsg(error.message);
+      if(!data) return authMsg("No account with that username.");
+      id=data;
+    }
+    const { error } = await sb.auth.signInWithPassword({ email:id, password:$("loginPw").value });
+    if(error) authMsg(error.message);
+  }catch(err){ authMsg("Something went wrong: "+(err.message||err)); }
+});
+
+$("forgot").onclick=async e=>{
+  e.preventDefault();
+  const id=$("loginId").value.trim();
+  if(!id.includes("@")) return authMsg("Type your email in the first field, then click this again.");
+  const { error } = await sb.auth.resetPasswordForEmail(id,{ redirectTo:location.href.split("#")[0] });
+  error ? authMsg(error.message) : authMsg("Password reset email sent.","ok");
+};
+
+// Defer Supabase calls out of this callback (calling them inside can deadlock).
+sb.auth.onAuthStateChange((_evt, session)=>{ setTimeout(()=>handleSession(session),0); });
+
+async function handleSession(session){
+  try{
+    if(session?.user){
+      if(S.user?.id===session.user.id) return;
+      S.user=session.user;
+      const { data } = await sb.from("profiles").select("username,avatar_path").eq("id",S.user.id).maybeSingle();
+      S.username=data?.username||S.user.email;
+      S.avatarPath=data?.avatar_path||null;
+      $("auth").classList.add("hidden"); $("app").classList.remove("hidden");
+      go("home");
+    } else {
+      S.user=null;
+      $("app").classList.add("hidden"); $("auth").classList.remove("hidden");
+      $("view").innerHTML="";
+    }
+  }catch(err){ console.error(err); authMsg("Login worked but the app failed to load: "+(err.message||err)); }
+}
+
+/* ---------- navigation ---------- */
+function setChrome(){
+  document.body.classList.toggle("reelsmode", S.view==="reels");
+  const isMe = S.view==="profile" && S.profileId===S.user.id;
+  const items=[["home","home",S.view==="home"],["reels","reels",S.view==="reels"],["create","plus",false],["me","user",isMe]];
+  $("nav").innerHTML = items.map(([to,icon,on])=>`<button class="${on?"on":""}" data-act="${to==="create"?"create":"nav"}" data-to="${to}">${ic(icon,26)}</button>`).join("");
+  $("feedSwitch").classList.toggle("hidden", S.view!=="home");
+  $("tabAll").classList.toggle("on", S.feed==="all");
+  $("tabFollowing").classList.toggle("on", S.feed==="following");
+}
+
+function go(view, profileId=null){
+  closeSheet();
+  S.view=view; S.profileId=profileId;
+  L={ from:0, done:false, busy:false, token:L.token+1 };
+  setChrome();
+  const v=$("view");
+  if(view==="home") v.innerHTML=`<div id="list"></div><div id="more" style="height:1px"></div>`;
+  else if(view==="reels") v.innerHTML=`<div class="reels" id="scroller"><div id="list" style="display:contents"></div><div id="more" style="height:1px"></div></div>`;
+  else { v.innerHTML=`<div id="phead"></div><div id="list" class="grid"></div><div id="more" style="height:1px"></div>`; loadProfile(); }
+  window.scrollTo(0,0);
+  armMore();
+  loadMore();
+}
+
+/* ---------- infinite scroll ---------- */
+let moreObs=null;
+function armMore(){
+  if(moreObs) moreObs.disconnect();
+  const root = S.view==="reels" ? $("scroller") : null;
+  moreObs = new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting)) loadMore(); },{ root, rootMargin: root ? "0px 0px 100% 0px" : "0px 0px 800px 0px" });
+  const m=$("more"); if(m) moreObs.observe(m);
+}
+
+async function fetchPage(){
+  let q = sb.from("posts").select(SEL).order("created_at",{ascending:false});
+  if(S.view==="profile") q=q.eq("user_id",S.profileId);
+  else if(S.view==="reels") q=q.eq("media_type","video");
+  else if(S.feed==="following"){
+    if(L.from===0){
+      const { data, error } = await sb.from("follows").select("followee_id").eq("follower_id",S.user.id);
+      if(error) throw error;
+      S.following=data.map(r=>r.followee_id);
+    }
+    if(!S.following.length) return [];
+    q=q.in("user_id",S.following);
+  }
+  const { data, error } = await q.range(L.from, L.from+PAGE-1);
+  if(error) throw error;
+  return data;
+}
+
+function remember(p){
+  P[p.id]={ liked:p.likes.some(l=>l.user_id===S.user.id), n:p.likes.length, c:p.comments?.[0]?.count||0 };
+}
+
+async function loadMore(){
+  if(L.busy||L.done) return;
+  L.busy=true; const tok=L.token;
+  try{
+    const rows=await fetchPage();
+    if(tok!==L.token) return;
+    const first = L.from===0;
+    rows.forEach(remember);
+    L.from+=rows.length;
+    if(rows.length<PAGE) L.done=true;
+    const list=$("list");
+    if(first && !rows.length){
+      const msg = S.view==="reels" ? "No videos yet." : S.view==="profile" ? "No posts yet." : S.feed==="following" ? "Follow people to see their posts here." : "No posts yet. Tap + to share something.";
+      list.innerHTML=`<div class="empty">${msg}</div>`;
+    } else {
+      const fn = S.view==="reels" ? reelHtml : S.view==="profile" ? tileHtml : postHtml;
+      list.insertAdjacentHTML("beforeend", rows.map(fn).join(""));
+      observeVideos(list);
+    }
+  }catch(err){ fail(err); }
+  finally{
+    if(tok===L.token){
+      L.busy=false;
+      const m=$("more"); if(m && !L.done && moreObs){ moreObs.unobserve(m); moreObs.observe(m); }
+    }
+  }
+}
+
+/* ---------- videos: autoplay in view, loop, tap for sound ---------- */
+const vidObs = new IntersectionObserver(es=>es.forEach(e=>{
+  const v=e.target;
+  if(e.isIntersecting){
+    v.muted=!S.sound;
+    v.play().catch(()=>{ v.muted=true; v.play().catch(()=>{}); });
+  } else v.pause();
+}),{ threshold:.6 });
+function observeVideos(root){ root.querySelectorAll("video[data-auto]").forEach(v=>vidObs.observe(v)); }
+function toggleSound(){
+  S.sound=!S.sound;
+  document.body.classList.toggle("sound",S.sound);
+  document.querySelectorAll("video[data-auto]").forEach(v=>v.muted=!S.sound);
+}
+
+/* ---------- render ---------- */
+function mediaHtml(p){
+  if(!p.media_path) return `<div class="media textpost" data-act="media" data-id="${p.id}"><div>${esc(p.body)}</div></div>`;
+  const url=esc(pubUrl(p.media_path));
+  return p.media_type==="video"
+    ? `<div class="media" data-act="media" data-id="${p.id}"><video data-auto loop muted playsinline preload="metadata" src="${url}"></video><span class="snd"></span></div>`
+    : `<div class="media" data-act="media" data-id="${p.id}"><img loading="lazy" src="${url}" alt=""></div>`;
+}
+
+function postHtml(p){
+  const s=P[p.id], u=p.profiles?.username||"unknown", mine=p.user_id===S.user.id;
+  return `<article class="post" data-id="${p.id}">
+    <div class="ph">
+      <a class="ring" data-act="profile" data-uid="${p.user_id}">${avatar(p.profiles?.avatar_path,u,32)}</a>
+      <a class="un" data-act="profile" data-uid="${p.user_id}">${esc(u)}</a>
+      <span class="meta">• ${ago(p.created_at)}</span>
+      ${mine?`<button class="more" data-act="del" data-id="${p.id}" data-path="${esc(p.media_path||"")}" title="Delete">${ic("trash",20)}</button>`:""}
+    </div>
+    ${mediaHtml(p)}
+    <div class="pa">
+      <button class="likebtn ${s.liked?"on":""}" data-act="like" data-like="${p.id}">${ic("heart",26)}</button>
+      <button data-act="comments" data-id="${p.id}">${ic("comment",26)}</button>
+    </div>
+    <div class="pl" data-lc="${p.id}">${likeText(s.n)}</div>
+    ${p.media_path&&p.body?`<div class="pc"><b>${esc(u)}</b> ${esc(p.body)}</div>`:""}
+    <button class="link" data-act="comments" data-id="${p.id}" data-cc="${p.id}">${commentText(s.c)}</button>
+  </article>`;
+}
+
+function reelHtml(p){
+  const s=P[p.id], u=p.profiles?.username||"unknown", mine=p.user_id===S.user.id;
+  return `<section class="reel" data-id="${p.id}">
+    <div class="rm" data-act="media" data-id="${p.id}"><video data-auto loop muted playsinline preload="metadata" src="${esc(pubUrl(p.media_path))}"></video><span class="snd"></span></div>
+    <div class="ov">
+      <div class="rl"><a class="ring" data-act="profile" data-uid="${p.user_id}">${avatar(p.profiles?.avatar_path,u,30)}</a><a data-act="profile" data-uid="${p.user_id}">${esc(u)}</a></div>
+      <div>${esc(p.body)}</div>
+    </div>
+    <div class="side">
+      <button class="likebtn ${s.liked?"on":""}" data-act="like" data-like="${p.id}">${ic("heart",30)}</button><span data-ln="${p.id}">${s.n}</span>
+      <button data-act="comments" data-id="${p.id}">${ic("comment",30)}</button><span data-cn="${p.id}">${s.c}</span>
+      ${mine?`<button data-act="del" data-id="${p.id}" data-path="${esc(p.media_path||"")}">${ic("trash",24)}</button>`:""}
+    </div>
+  </section>`;
+}
+
+function tileHtml(p){
+  let inner;
+  if(p.media_type==="video") inner=`<video muted preload="metadata" src="${esc(pubUrl(p.media_path))}#t=0.1"></video><span class="tb">${ic("play",18)}</span>`;
+  else if(p.media_path) inner=`<img loading="lazy" src="${esc(pubUrl(p.media_path))}" alt="">`;
+  else inner=`<div class="tt">${esc((p.body||"").slice(0,90))}</div>`;
+  return `<a class="tile" data-act="open" data-id="${p.id}">${inner}</a>`;
+}
+
+/* ---------- likes & comment counts (updated in place) ---------- */
+function paintLike(id){
+  const s=P[id];
+  document.querySelectorAll(`[data-like="${id}"]`).forEach(b=>b.classList.toggle("on",s.liked));
+  document.querySelectorAll(`[data-lc="${id}"]`).forEach(el=>el.textContent=likeText(s.n));
+  document.querySelectorAll(`[data-ln="${id}"]`).forEach(el=>el.textContent=s.n);
+}
+function paintComments(id){
+  const s=P[id];
+  document.querySelectorAll(`[data-cc="${id}"]`).forEach(el=>el.textContent=commentText(s.c));
+  document.querySelectorAll(`[data-cn="${id}"]`).forEach(el=>el.textContent=s.c);
+}
+async function doLike(id, onlyAdd){
+  const s=P[id]; if(!s || (onlyAdd && s.liked)) return;
+  const want=!s.liked;
+  s.liked=want; s.n+=want?1:-1; paintLike(id);
+  const { error } = want
+    ? await sb.from("likes").insert({ post_id:id })
+    : await sb.from("likes").delete().eq("post_id",id).eq("user_id",S.user.id);
+  if(error){ s.liked=!want; s.n+=want?-1:1; paintLike(id); fail(error); }
+}
+function pop(el){
+  const d=document.createElement("div"); d.className="pop"; d.innerHTML=ic("heart",90,true);
+  el.appendChild(d); setTimeout(()=>d.remove(),800);
+}
+
+/* ---------- sheet ---------- */
+function openSheet(title, body, foot="", flush=false){
+  $("sheetPanel").innerHTML=`<div class="sh-head">${esc(title)}<button data-act="close">✕</button></div>
+    <div class="sh-body ${flush?"flush":""}" id="shBody">${body}</div>${foot?`<div class="sh-foot">${foot}</div>`:""}`;
+  $("sheet").classList.remove("hidden");
+}
+function closeSheet(){ $("sheet").classList.add("hidden"); $("sheetPanel").innerHTML=""; S.createFile=null; }
+
+/* ---------- comments ---------- */
+async function openComments(id){
+  openSheet("Comments", `<div id="clist" class="meta">Loading…</div>`,
+    `<input id="cin" placeholder="Add a comment…" data-post="${id}"><button class="btn" data-act="csend" data-id="${id}">Post</button>`);
+  loadComments(id);
+}
+async function loadComments(id){
+  const { data, error } = await sb.from("comments").select("*, profiles!user_id(username,avatar_path)").eq("post_id",id).order("created_at");
+  if(error) return fail(error);
+  const box=$("clist"); if(!box) return;
+  box.className="";
+  box.innerHTML = data.length ? data.map(c=>{
+    const u=c.profiles?.username||"unknown";
+    return `<div class="comment">
+      <a data-act="profile" data-uid="${c.user_id}">${avatar(c.profiles?.avatar_path,u,32)}</a>
+      <div><b>${esc(u)}</b> ${esc(c.body)}<div class="meta">${ago(c.created_at)}${c.user_id===S.user.id?`<button class="x" data-act="delcomment" data-id="${c.id}" data-post="${id}">Delete</button>`:""}</div></div>
+    </div>`;}).join("") : `<div class="empty" style="padding:30px 0">No comments yet.</div>`;
+}
+async function sendComment(id){
+  const input=$("cin"); const body=input.value.trim(); if(!body) return;
+  input.value="";
+  const { error } = await sb.from("comments").insert({ post_id:id, body });
+  if(error){ input.value=body; return fail(error); }
+  P[id].c++; paintComments(id); loadComments(id);
+}
+
+/* ---------- single post (from profile grid) ---------- */
+async function openPost(id){
+  const { data, error } = await sb.from("posts").select(SEL).eq("id",id).maybeSingle();
+  if(error||!data) return fail(error||"Post not found");
+  remember(data);
+  openSheet("Post", postHtml(data), "", true);
+  observeVideos($("sheetPanel"));
+}
+
+/* ---------- profile ---------- */
+async function loadProfile(){
+  const id=S.profileId, isMe=id===S.user.id;
+  const head=$("phead");
+  const [{data:p,error}, np, fr, fg, mine] = await Promise.all([
+    sb.from("profiles").select("id,username,bio,avatar_path").eq("id",id).maybeSingle(),
+    sb.from("posts").select("*",{count:"exact",head:true}).eq("user_id",id),
+    sb.from("follows").select("*",{count:"exact",head:true}).eq("followee_id",id),
+    sb.from("follows").select("*",{count:"exact",head:true}).eq("follower_id",id),
+    sb.from("follows").select("*").eq("follower_id",S.user.id).eq("followee_id",id).maybeSingle()
+  ]);
+  if(!head) return;
+  if(error||!p){ head.innerHTML=`<div class="empty">User not found.</div>`; return; }
+  if(isMe){ S.bio=p.bio||""; S.avatarPath=p.avatar_path||null; }
+  head.innerHTML=`
+    <div class="pp">
+      <div class="ring">${avatar(p.avatar_path,p.username,80)}</div>
+      <div class="stats">
+        <div><b>${np.count||0}</b>posts</div>
+        <div><b>${fr.count||0}</b>followers</div>
+        <div><b>${fg.count||0}</b>following</div>
+      </div>
+    </div>
+    <div class="pn">
+      <b>${esc(p.username)}</b>
+      ${p.bio?`<div style="white-space:pre-wrap">${esc(p.bio)}</div>`:""}
+      <div class="row">
+        ${isMe
+          ? `<button class="btn2" data-act="editprofile">Edit profile</button><button class="btn2" data-act="logout">Log out</button>`
+          : `<button class="${mine.data?"btn2":"btn"}" data-act="follow" data-uid="${id}" data-following="${!!mine.data}">${mine.data?"Following":"Follow"}</button>`}
+      </div>
+    </div>`;
+}
+
+/* ---------- create post ---------- */
+function openCreate(){
+  S.createFile=null;
+  openSheet("New post",
+    `<textarea id="cap" rows="3" placeholder="Write a caption…"></textarea>
+     <div id="prev"></div>
+     <input type="file" id="cfile" accept="image/*,video/*" class="hidden">
+     <div style="margin-top:12px"><button class="btn2" data-act="pick">Choose photo or video</button></div>`,
+    `<button class="btn grow" id="share" data-act="share">Share</button>`);
+}
+async function share(){
+  const cap=$("cap").value.trim(), file=S.createFile;
+  if(!cap && !file) return;
+  if(file && file.size>MAX_MB*1024*1024) return toast(`File is over ${MAX_MB} MB`);
+  const btn=$("share"); btn.disabled=true; btn.textContent="Sharing…";
+  try{
+    let media_path=null, media_type=null;
+    if(file){
+      media_path=`${S.user.id}/${Date.now()}_${safeName(file.name)}`;
+      const { error } = await sb.storage.from(BUCKET).upload(media_path,file,{ contentType:file.type||undefined, upsert:false });
+      if(error) throw error;
+      media_type=file.type.startsWith("video/")?"video":"image";
+    }
+    const { error } = await sb.from("posts").insert({ body:cap, media_path, media_type });
+    if(error){ if(media_path) await sb.storage.from(BUCKET).remove([media_path]); throw error; }
+    toast("Shared");
+    go(S.view==="reels" && media_type==="video" ? "reels" : "home");
+  }catch(err){ fail(err); btn.disabled=false; btn.textContent="Share"; }
+}
+
+async function uploadAvatar(file){
+  if(!file.type.startsWith("image/")) return toast("Pick an image");
+  if(file.size>MAX_MB*1024*1024) return toast(`File is over ${MAX_MB} MB`);
+  const path=`${S.user.id}/avatar_${Date.now()}_${safeName(file.name)}`;
+  const { error:upErr } = await sb.storage.from(BUCKET).upload(path,file,{ contentType:file.type, upsert:false });
+  if(upErr) return fail(upErr);
+  const { error } = await sb.from("profiles").update({ avatar_path:path }).eq("id",S.user.id);
+  if(error){ await sb.storage.from(BUCKET).remove([path]); return fail(error); }
+  if(S.avatarPath) await sb.storage.from(BUCKET).remove([S.avatarPath]);
+  S.avatarPath=path;
+  toast("Photo updated");
+  closeSheet(); loadProfile();
+}
+
+/* ---------- events ---------- */
+let lastTap=0, lastTapId=null, tapTimer=null;
+
+document.addEventListener("click", async e=>{
+  if(e.target.id==="sheet") return closeSheet();
+  const a=e.target.closest("[data-act]"); if(!a) return;
+  const act=a.dataset.act, id=a.dataset.id;
+
+  switch(act){
+    case "nav":
+      return a.dataset.to==="me" ? go("profile",S.user.id) : go(a.dataset.to);
+    case "create": return openCreate();
+    case "feed": S.feed=a.dataset.feed; return go("home");
+    case "close": return closeSheet();
+    case "profile": return go("profile", a.dataset.uid);
+    case "open": return openPost(id);
+    case "like": return doLike(id,false);
+    case "comments": return openComments(id);
+    case "csend": return sendComment(id);
+    case "pick": return $("cfile").click();
+    case "share": return share();
+    case "logout": return sb.auth.signOut();
+    case "pickavatar": return $("afile").click();
+
+    case "media": {
+      const now=Date.now();
+      if(now-lastTap<300 && lastTapId===id){
+        clearTimeout(tapTimer); lastTap=0;
+        pop(a); doLike(id,true);
+      } else {
+        lastTap=now; lastTapId=id;
+        clearTimeout(tapTimer);
+        tapTimer=setTimeout(()=>{ if(a.querySelector("video")) toggleSound(); },300);
+      }
+      return;
+    }
+    case "del": {
+      if(!confirm("Delete this post?")) return;
+      if(a.dataset.path) await sb.storage.from(BUCKET).remove([a.dataset.path]);
+      const { error } = await sb.from("posts").delete().eq("id",id);
+      if(error) return fail(error);
+      document.querySelectorAll(`.post[data-id="${id}"],.reel[data-id="${id}"],.tile[data-id="${id}"]`).forEach(el=>el.remove());
+      closeSheet();
+      if(S.view==="profile") loadProfile();
+      return;
+    }
+    case "delcomment": {
+      if(!confirm("Delete this comment?")) return;
+      const { error } = await sb.from("comments").delete().eq("id",id);
+      if(error) return fail(error);
+      const pid=a.dataset.post; P[pid].c=Math.max(0,P[pid].c-1); paintComments(pid); loadComments(pid);
+      return;
+    }
+    case "follow": {
+      const uid=a.dataset.uid;
+      const { error } = a.dataset.following==="true"
+        ? await sb.from("follows").delete().eq("follower_id",S.user.id).eq("followee_id",uid)
+        : await sb.from("follows").insert({ followee_id:uid });
+      return error ? fail(error) : loadProfile();
+    }
+    case "editprofile":
+      return openSheet("Edit profile",
+        `<label>Bio</label><textarea id="bioIn" rows="3" maxlength="150">${esc(S.bio)}</textarea>
+         <div style="margin-top:14px"><button class="btn2" data-act="pickavatar">Change profile photo</button>
+         <input type="file" id="afile" accept="image/*" class="hidden"></div>`,
+        `<button class="btn grow" data-act="savebio">Save</button>`);
+    case "savebio": {
+      const bio=$("bioIn").value.trim();
+      const { error } = await sb.from("profiles").update({ bio }).eq("id",S.user.id);
+      if(error) return fail(error);
+      S.bio=bio; closeSheet(); loadProfile(); return toast("Saved");
+    }
+  }
+});
+
+document.addEventListener("change", e=>{
+  if(e.target.id==="afile" && e.target.files[0]) uploadAvatar(e.target.files[0]);
+  if(e.target.id==="cfile" && e.target.files[0]){
+    const f=e.target.files[0]; S.createFile=f;
+    const url=URL.createObjectURL(f);
+    $("prev").innerHTML = f.type.startsWith("video/")
+      ? `<video src="${url}" controls muted playsinline loop></video>`
+      : `<img src="${url}" alt="">`;
+  }
+});
+
+document.addEventListener("keydown", e=>{
+  if(e.key==="Enter" && e.target.id==="cin") sendComment(e.target.dataset.post);
+  if(e.key==="Escape") closeSheet();
+});
+</script>
+</body>
+</html>
